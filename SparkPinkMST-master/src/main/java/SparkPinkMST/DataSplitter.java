@@ -194,6 +194,10 @@ public class DataSplitter {
 	}
 
 	public void writeSequenceFiles(int numPoints, int numDimension) throws Exception {
+		//function saves the given 
+
+		//numPoints and numDimensions taken here are kinda point less since 
+		//it's any way read as first two input from input file in loadData()
 		loadData();
 		Point value = new Point();
 		int pointId = 0;
@@ -263,7 +267,7 @@ public class DataSplitter {
 	}
 
 	private void saveAsSequenceFile(List<Point> points) {
-
+		
 		File outputFile = new File(outputDir);
 		if (outputFile.exists()) {
 			LOGGER.info("the directory exists: " + outputDir);
@@ -276,12 +280,13 @@ public class DataSplitter {
 			LOGGER.info("the directory is deleted: " + outputDir);
 		}
 
+		/* saving the points as some binary files
+		*/
 		JavaRDD<Point> pointsToWrite = sc.parallelize(points, numSplits);
 		JavaPairRDD<NullWritable, PointWritable> pointsPairToWrite = pointsToWrite.mapToPair(new ToPairFunction());
 
 		try {
-			pointsPairToWrite.saveAsHadoopFile(outputDir, NullWritable.class, PointWritable.class,
-					SequenceFileOutputFormat.class);
+			pointsPairToWrite.saveAsHadoopFile(outputDir, NullWritable.class, PointWritable.class,SequenceFileOutputFormat.class);
 		} catch (Exception e) {
 			return;
 		}
@@ -301,7 +306,7 @@ public class DataSplitter {
 	private void loadData() throws IOException {
 		
 		/* loads the points in instance field "data"
-		2D float array of dimension numPoint*numDimension
+		2D double array of dimension numPoint*numDimension
 		so each row is a point and each coordinate is an element in the array.
 		*/
 		final int doubleSizeInBytes = Double.SIZE / 8;

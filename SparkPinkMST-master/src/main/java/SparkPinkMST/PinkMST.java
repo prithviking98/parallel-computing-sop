@@ -86,7 +86,6 @@ public class PinkMST {
         int[] tmpNext, tmpParent;
         int tmpNumPoints = 0;
         // edges = new EdgeWritable[npts1 + npts2 - 1];
-        // /////////////////////////////
         for (int i = 0; i < numLeftPoints; i++) {
             key1[i] = Double.MAX_VALUE;
             next1[i] = i;

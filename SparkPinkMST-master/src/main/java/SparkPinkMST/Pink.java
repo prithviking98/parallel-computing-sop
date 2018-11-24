@@ -29,7 +29,7 @@ public class Pink {
 	public static void main(String[] args) throws Exception {
 
 		//default values
-		int K = 3;
+		int K = 3; // k - way merge parameter
 		int numDataSplits = 2;
 		int numPoints = 32 * 1024;
 		int numDimensions = 10;
@@ -51,9 +51,7 @@ public class Pink {
 					dataSetName, numPoints, numDimensions, numDataSplits, K, configFile);
 		}
 
-		//so apparently numDataSplits is the number of disjoint sets of points you're making
-		//So I don't know what K is.
-		int numSubGraphs = numDataSplits * (numDataSplits - 1) / 2 + numDataSplits;
+		int numSubGraphs = numDataSplits * (numDataSplits - 1) / 2 + numDataSplits; // nC2 + n, n is number of splits
 
 		final String EXPERIMENT_HOME = FS_PREFIX + dataSetName + "_d" + numDimensions + "_s" + numDataSplits;
 
@@ -78,23 +76,30 @@ public class Pink {
 		/* MUST UNDERSTAND STUFF ABOVE BEFORE PROCEEDING, ABOVE EXPLAINS THE INPUT
 		*/
 
+		//returns RDD with numSubGraphs splits
 		JavaRDD<String> partitionRDD = sc.textFile(idPartitionFilesLoc, numSubGraphs);
 		long start = System.currentTimeMillis();
-		JavaPairRDD<Integer, Edge> partitions = partitionRDD.flatMapToPair(new GetPartitionFunction(
-				dataParitionFilesLoc, numDataSplits));
-		// how to parallelize the edgePairList
+		//map every subGraphId to the List of mst edges from that sub graph
+		//MST calculation is done independently (and so, if possible, parallely) for each ID (each ID is a partition of the RDD)
+		//the integer in the pair is the sub graph ID
+		JavaPairRDD<Integer, Edge> partitions = partitionRDD.flatMapToPair(new GetPartitionFunction(dataParitionFilesLoc, numDataSplits));
+
 		// create the collection of edges for the Kruskal Merge
-		JavaPairRDD<Integer, Iterable<Edge>> mstToBeMerged = partitions.combineByKey(new CreateCombiner(),
-				new Merger(), new KruskalReducer(numPoints));
+		//this step is basically reversing the effect of the above flatMap. It's combining all the edges having same key into a list.
+		// The KruskalReducer passed is not being used because all the edges belonging to one subgraph ID are already in the same RDD partition.	
+		JavaPairRDD<Integer, Iterable<Edge>> mstToBeMerged = partitions.combineByKey(new CreateCombiner(),new Merger(), new KruskalReducer(numPoints));
+		/* NOTE: reduceByKey is pretty much same as combineByKey (in fact, reduceByKey internally calls combineByKey).
+		The only difference is that in combineByKey, the output RDD can have a different type for value of the pair.
+		*/
+
 		JavaPairRDD<Integer, Iterable<Edge>> mstToBeMergedResult = null;
 		while (numSubGraphs > 1) {
 			numSubGraphs = (numSubGraphs + (K - 1)) / K;
-			mstToBeMergedResult = mstToBeMerged.mapToPair(new SetPartitionIdFunction(K)).reduceByKey(
-					new KruskalReducer(numPoints), numSubGraphs);
+			mstToBeMergedResult = mstToBeMerged.mapToPair(new SetPartitionIdFunction(K)).reduceByKey(new KruskalReducer(numPoints), numSubGraphs);
 			mstToBeMerged = mstToBeMergedResult;
 		}
 
-		if (mstToBeMergedResult.splits().size() != 1) {
+		if (mstToBeMergedResult.getNumPartitions() != 1) {
 			throw new RuntimeException("the split Size is not one");
 		}
 
@@ -201,9 +206,8 @@ public class Pink {
 		}
 	}
 
-	private static class SetPartitionIdFunction implements
-			PairFunction<Tuple2<Integer, Iterable<Edge>>, Integer, Iterable<Edge>> {
-
+	private static class SetPartitionIdFunction implements PairFunction<Tuple2<Integer, Iterable<Edge>>, Integer, Iterable<Edge>> 
+	{
 		private static final long serialVersionUID = 1L;
 
 		private final int K;
@@ -232,13 +236,13 @@ public class Pink {
 		}
 
 		@Override
-		public Iterable<Tuple2<Integer, Edge>> call(String row) throws Exception {
+		public Iterator<Tuple2<Integer, Edge>> call(String row) throws Exception {
 			final int partionId = Integer.parseInt(row);
-			Tuple2<List<Point>, List<Point>> subGraphsPair = getSubGraphPair(partionId, numDataSplits,
-					inputDataFilesLoc);
+			Tuple2<List<Point>, List<Point>> subGraphsPair = getSubGraphPair(partionId, numDataSplits,inputDataFilesLoc);
 			PinkMST pinkMst = new PinkMST(subGraphsPair, partionId);
+			//returns all the edges in the MST
 			List<Tuple2<Integer, Edge>> edgeList = pinkMst.getEdgeList();
-			return edgeList;
+			return edgeList.iterator();
 		}
 
 	}
@@ -258,8 +262,12 @@ public class Pink {
 		return list;
 	}
 
-	private static Tuple2<List<Point>, List<Point>> getSubGraphPair(int partitionId, int numDataSplits,
-			String inputDataFilesLoc) throws Exception {
+	private static Tuple2<List<Point>, List<Point>> getSubGraphPair(int partitionId, int numDataSplits,String inputDataFilesLoc) throws Exception {
+
+		//returns a pair of List<Point> corresponding to the two partitions used to make
+		//the sub graph given by partitionId
+		//If the sub graph is full bipartite, then the two lists represent the two sets of points
+		//If the sub graph is fully connecetd one, then the right list is null
 		int rightId = -1;
 		int leftId = -1;
 		int numBipartiteSubgraphs = numDataSplits * (numDataSplits - 1) / 2;
