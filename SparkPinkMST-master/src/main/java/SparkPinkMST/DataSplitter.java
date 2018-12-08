@@ -31,6 +31,7 @@ import scala.Tuple2;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Iterables;
 
 /**
  * Created by cjin on 4/27/14.
@@ -146,44 +147,48 @@ public class DataSplitter {
 
 	public JavaSparkContext initSparkContext(String configureFile) throws Exception {
 		SparkConf sparkConf = new SparkConf(false);
-		File file = new File(configureFile);
-		if (configureFile != null && file.exists()) {
-			Properties properties = new Properties();
-			properties.load(new FileInputStream(file));
+		sparkConf.setAppName("Pink");	
+		if (configureFile != null ) {
+			File file = new File(configureFile);
+			if(file.exists()){
+				Properties properties = new Properties();
+				properties.load(new FileInputStream(file));
 
-			sparkConf.setAppName("Pink");
-			String masterUrl = properties.getProperty("pink.masterUrl");
-			String sparkHome = properties.getProperty("pink.sparkHome");
+				String masterUrl = properties.getProperty("pink.masterUrl");
+				String sparkHome = properties.getProperty("pink.sparkHome");
 
-			sparkConf.setMaster(masterUrl);
-			sparkConf.setSparkHome(sparkHome);
+				sparkConf.setMaster(masterUrl);
+				sparkConf.setSparkHome(sparkHome);
 
-			String jarPathsIn = properties.getProperty("pink.jarPaths", "");
-			Iterable<String> jarPathsIterable = Splitter.on(',').split(jarPathsIn);
-			String clientConfigString = properties.getProperty("pink.cli.dtclient.config", ".");
-			Path clientConfigPath = FileSystems.getDefault().getPath(clientConfigString);
+				String jarPathsIn = properties.getProperty("pink.jarPaths");
+				Iterable<String> jarPathsIterable = Splitter.on(',').split(jarPathsIn);
+				// String clientConfigString = properties.getProperty("pink.cli.dtclient.config", ".");
+				// Path clientConfigPath = FileSystems.getDefault().getPath(clientConfigString);
 
-			List<PathMatcher> exclusionPathMatchers = Lists.newArrayList();
-			for (String glob : jarPathsIterable) {
-				exclusionPathMatchers.add(getGlobMatcher(glob));
-			}
+				// List<PathMatcher> exclusionPathMatchers = Lists.newArrayList();
+				// for (String glob : jarPathsIterable) {
+				// 	exclusionPathMatchers.add(getGlobMatcher(glob));
+				// }
 
-			// add jars
-			List<String> jarPaths = Lists.newArrayList();
-			for (String jarPath : jarPathsIterable) {
-				addJarPaths(jarPaths, exclusionPathMatchers, clientConfigPath, jarPath);
-			}
+				// // add jars
+				List<String> jarPaths = Lists.newArrayList();
+				for (String jarPath : jarPathsIterable) {
+					// addJarPaths(jarPaths, exclusionPathMatchers, clientConfigPath, jarPath);
+					jarPaths.add(jarPath);
+				}
 
-			for (String path : jarPaths) {
-				System.out.println("addjar: " + path);
-			}
-			sparkConf.setJars(jarPaths.toArray(new String[jarPaths.size()]));
+				// for (String path : jarPaths) {
+				// 	System.out.println("addjar: " + path);
+				// }
+				sparkConf.setJars(jarPaths.toArray(new String[jarPaths.size()]));
 
-			for (Object key : properties.keySet()) {
-				if (((String) key).startsWith("spark.")) {
-					sparkConf.set((String) key, (String) properties.get(key));
+				for (Object key : properties.keySet()) {
+					if (((String) key).startsWith("spark.")) {
+						sparkConf.set((String) key, (String) properties.get(key));
+					}
 				}
 			}
+			
 		}
 
 		return new JavaSparkContext(sparkConf);
@@ -194,7 +199,8 @@ public class DataSplitter {
 	}
 
 	public void writeSequenceFiles(int numPoints, int numDimension) throws Exception {
-		//function saves the given 
+		//function saves the given input points as seperated files. Each point is given
+		// a unique ID.
 
 		//numPoints and numDimensions taken here are kinda point less since 
 		//it's any way read as first two input from input file in loadData()
@@ -314,8 +320,10 @@ public class DataSplitter {
 		DataInputStream dataIn = new DataInputStream(new FileInputStream(new File(inputFileName)));
 		
 		//i guess the reading happens in some reverse order
-		numPoints = swapBytesInt(dataIn.readInt());
-		numDimension = swapBytesInt(dataIn.readInt());
+		// numPoints = swapBytesInt(dataIn.readInt());
+		// numDimension = swapBytesInt(dataIn.readInt());
+		numPoints = dataIn.readInt();
+		numDimension = dataIn.readInt();
 		System.out.println("data dimensions: " + numPoints + "," + numDimension);
 		data = new Double[numPoints][numDimension];
 
@@ -329,7 +337,8 @@ public class DataSplitter {
 			dataIn.read(result, 0, pointSizeInBytes);
 			for (int j = 0; j < numDimension; j++) {
 				System.arraycopy(result, offset, bytes, 0, doubleSizeInBytes);
-				data[i][j] = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getDouble();
+				//used to be LITTLE_ENDIAN
+				data[i][j] = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN).getDouble();
 				offset += doubleSizeInBytes;
 			}
 		}

@@ -1,6 +1,6 @@
 # Spark PinkMST
 
-#### (modified and documented by Prithvi Raj Nair, <f2016013@pilani.bits-pilani.ac.in> )
+## (modified and documented by Prithvi Raj Nair, <f2016013@pilani.bits-pilani.ac.in> )
 Chen Jin, <karen.cj@gmail.com>
 
 This repository contains source code that implements PinkMST algorithm which is detailed in paper 

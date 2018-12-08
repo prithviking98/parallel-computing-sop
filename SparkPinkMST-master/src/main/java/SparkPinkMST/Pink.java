@@ -31,11 +31,11 @@ public class Pink {
 		//default values
 		int K = 3; // k - way merge parameter
 		int numDataSplits = 2;
-		int numPoints = 32 * 1024;
-		int numDimensions = 10;
-		String dataSetName = "clust32k";
-		String configFile = null;
-		String PROJECT_HOME = "/Users/cjin/Downloads/data/";
+		int numPoints = 10;
+		int numDimensions = 2;
+		String dataSetName = "default";
+		String configFile = "/home/prithvi/sop_code/SparkPinkMST-master/sparkConfig";
+		String PROJECT_HOME = "/home/prithvi/clustering_datasets/";
 		String FS_PREFIX = "file://";
 		if (args.length == 8) {
 			dataSetName = args[0];
@@ -48,12 +48,13 @@ public class Pink {
 			FS_PREFIX = args[7];
 			System.out.format(
 					"PinkConfig: dataSet=%s numPoints=%d numDimensions=%d numDataSplits=%d K=%d configFile=%s\n",
-					dataSetName, numPoints, numDimensions, numDataSplits, K, configFile);
+								dataSetName, numPoints, numDimensions, numDataSplits, K, configFile);
 		}
 
 		int numSubGraphs = numDataSplits * (numDataSplits - 1) / 2 + numDataSplits; // nC2 + n, n is number of splits
 
-		final String EXPERIMENT_HOME = FS_PREFIX + dataSetName + "_d" + numDimensions + "_s" + numDataSplits;
+		// original final String EXPERIMENT_HOME = FS_PREFIX + dataSetName + "_d" + numDimensions + "_s" + numDataSplits;
+		final String EXPERIMENT_HOME = FS_PREFIX + "/home/prithvi/clustering_temp/" + dataSetName + "_d" + numDimensions + "_s" + numDataSplits;
 
 		if (FS_PREFIX.startsWith("file")) {
 			final File dir = new File(EXPERIMENT_HOME);
